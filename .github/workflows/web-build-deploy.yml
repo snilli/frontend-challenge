@@ -1,0 +1,93 @@
+name: Web Build and Deploy
+
+on:
+  push:
+    paths: ["web/**"]
+    branches: ["sit", "uat", "prod"]
+
+  release:
+    types: ["published"]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    env:
+      DOCKER_BUILDKIT: 1
+      COMPOSE_DOCKER_CLI_BUILD: 1
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: satackey/action-docker-layer-caching@v0.0.11
+        continue-on-error: true
+        with:
+          key: ${{ github.workflow }}-${{ github.sha }}-{hash}
+          restore-keys: |
+            ${{ github.workflow }}-${{ github.sha }}-
+
+      - if: ${{ github.ref == 'refs/heads/sit' || github.ref == 'refs/heads/uat' || github.ref == 'refs/heads/prod' || contains(github.ref, 'refs/tag') }}
+        name: Build docker image
+        run: docker image build -t web:latest --build-arg BUILD_NUMBER=$(git rev-parse --short HEAD) ./web
+
+  publish-image:
+
+    needs: [build]
+
+    runs-on: ubuntu-latest
+
+    if: ${{ github.ref == 'refs/heads/sit' || github.ref == 'refs/heads/uat' || github.ref == 'refs/heads/prod' || contains(github.ref, 'refs/tag') }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: satackey/action-docker-layer-caching@v0.0.11
+        continue-on-error: true
+        with:
+          key: ${{ github.workflow }}-${{ github.sha }}-{hash}
+          restore-keys: |
+            ${{ github.workflow }}-${{ github.sha }}-
+          skip-save: true
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.ML_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ML_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.ML_AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          registries: ${{ secrets.AWS_ECR_ACCOUNT_ID }}
+
+      - name: Get package version
+        id: package_version
+        uses: Saionaro/extract-package-version@v1.1.1
+        with:
+          path: web
+
+      - name: Set Image tag
+        id: image-tag
+        run: |
+          if [[ ${{ github.ref }} == 'refs/tags'** ]]
+          then
+            echo "::set-output name=value::${{ steps.package_version.outputs.version }}"
+          else
+            echo "::set-output name=value::$(git rev-parse --short HEAD)"
+          fi
+
+      - name: Push image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_BILLING_WEB_REPOSITORY }}
+          IMAGE_TAG: ${{ steps.image-tag.outputs.value }}
+        run: |-
+          docker tag web:latest $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker tag web:latest $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          if [[ ${{ github.ref }} == 'refs/heads/develop' ]]
+          then
+            docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          fi
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+      

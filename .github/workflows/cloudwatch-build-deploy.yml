@@ -1,0 +1,98 @@
+name: Cloudwatch Build and Deploy
+
+on:
+  push:
+    paths: ["cloudwatch/**"]
+    branches: ["sit", "uat", "prod"]
+
+  release:
+    types: ["published"]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: satackey/action-docker-layer-caching@v0.0.11
+        continue-on-error: true
+        with:
+          key: ${{ github.workflow }}-${{ github.sha }}-{hash}
+          restore-keys: ${{ github.workflow }}-${{ github.sha }}-
+
+      - if: ${{ github.ref == 'refs/heads/sit' || github.ref == 'refs/heads/uat' || github.ref == 'refs/heads/prod' || contains(github.ref, 'refs/tag') }}
+        name: Build docker image
+        env: 
+          DOCKER_BUILDKIT: 1
+          AWS_ACCESS_KEY_ID: ${{ secrets.ML_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ML_AWS_SECRET_ACCESS_KEY }}
+        run: |-
+          docker image build -t cloudwatch:cloudwatch-to-psqldb-latest \
+            --build-arg BUILD_NUMBER=$(git rev-parse --short HEAD) \
+            --build-arg AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+            --build-arg AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+            ./cloudwatch
+
+  publish-image:
+
+    needs: [build]
+
+    runs-on: ubuntu-latest
+
+    if: ${{ github.ref == 'refs/heads/sit' || github.ref == 'refs/heads/uat' || github.ref == 'refs/heads/prod' || contains(github.ref, 'refs/tag') }}
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: satackey/action-docker-layer-caching@v0.0.11
+        continue-on-error: true
+        with:
+          key: ${{ github.workflow }}-${{ github.sha }}-{hash}
+          restore-keys: ${{ github.workflow }}-${{ github.sha }}-
+          skip-save: true
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.ML_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ML_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.ML_AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          registries: ${{ secrets.AWS_ECR_ACCOUNT_ID }}
+
+      - name: Get package version
+        id: package_version
+        uses: Saionaro/extract-package-version@v1.1.1
+        with:
+          path: cloudwatch
+
+      - name: Set Image tag
+        id: image-tag
+        run: |
+          if [[ ${{ github.ref }} == 'refs/tags'** ]]
+          then
+            echo "::set-output name=value::cloudwatch-to-psqldb-${{ steps.package_version.outputs.version }}"
+          else
+            echo "::set-output name=value::cloudwatch-to-psqldb-$(git rev-parse --short HEAD)"
+          fi
+
+      - name: Push image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_BILLING_CRONJOB_REPOSITORY }}
+          IMAGE_TAG: ${{ steps.image-tag.outputs.value }}
+        run: |-
+          docker tag cloudwatch:cloudwatch-to-psqldb-latest $ECR_REGISTRY/$ECR_REPOSITORY:cloudwatch-to-psqldb-latest
+          docker tag cloudwatch:cloudwatch-to-psqldb-latest $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          if [[ ${{ github.ref }} == 'refs/heads/develop' ]]
+          then
+            docker push $ECR_REGISTRY/$ECR_REPOSITORY:cloudwatch-to-psqldb-latest
+          fi
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+      

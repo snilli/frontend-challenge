@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model m_email_template {
+  id            Int      @id @unique(map: "pk_m_email_template") @default(autoincrement())
+  email_code    String
+  email_subject String   @db.VarChar(200)
+  email_body    String
+  create_date   DateTime @default(now()) @db.Timestamptz(6)
+  create_by     String?  @db.VarChar(50)
+  update_date   DateTime @default(now()) @db.Timestamptz(6)
+  update_by     String?  @db.VarChar(50)
+}
+
+model m_org {
+  org_code              String                  @id @unique(map: "pk_m_org") @db.VarChar(50)
+  create_date           DateTime                @default(now()) @db.Timestamptz(6)
+  create_by             String                  @db.VarChar(50)
+  update_date           DateTime                @default(now()) @db.Timestamptz(6)
+  update_by             String                  @db.VarChar(50)
+  is_allow_exceed_limit Boolean?                @default(false)
+  delete_date           DateTime?               @db.Timestamptz(6)
+  is_demo               Boolean                 @default(false)
+  org_name              String                  @db.VarChar(200)
+  address               String?
+  tel_no                String?                 @db.VarChar(100)
+  fax_no                String?                 @db.VarChar(100)
+  admin_email           String?                 @db.VarChar(100)
+  usage_plan_id         String?                 @db.VarChar(100)
+  m_org_key_mapping     m_org_key_mapping[]
+  m_org_package         m_org_package[]
+  m_org_service_element m_org_service_element[]
+  t_integration         t_integration[]
+
+  @@index([usage_plan_id], map: "m_org_usage_plan_id")
+}
+
+model m_org_key_mapping {
+  org_code      String    @db.VarChar(50)
+  ref_key       String    @db.VarChar(100)
+  create_date   DateTime  @default(now()) @db.Timestamptz(6)
+  create_by     String?   @db.VarChar(50)
+  update_date   DateTime  @default(now()) @db.Timestamptz(6)
+  update_by     String?   @db.VarChar(50)
+  delete_date   DateTime? @db.Timestamptz(6)
+  key_type      String    @default("username") @db.VarChar(10)
+  api_key_name  String?   @db.VarChar(50)
+  api_key_value String?   @db.VarChar(50)
+  m_org         m_org     @relation(fields: [org_code], references: [org_code], onDelete: NoAction)
+
+  @@id([org_code, ref_key])
+  @@unique([org_code, ref_key], map: "pk_m_org_key_mapping")
+}
+
+model m_org_package {
+  org_code       String    @db.VarChar(50)
+  package_id     Int
+  create_date    DateTime  @default(now()) @db.Timestamptz(6)
+  create_by      String?   @db.VarChar(50)
+  update_date    DateTime  @default(now()) @db.Timestamptz(6)
+  update_by      String?   @db.VarChar(50)
+  start_date     DateTime? @db.Timestamptz(6)
+  expire_date    DateTime? @db.Timestamptz(6)
+  org_package_id Int       @id @unique(map: "pk_m_org_package") @default(autoincrement())
+  active_status  Boolean?  @default(false)
+  credit_remain  Decimal   @default(0.0) @db.Decimal(10, 2)
+  delete_date    DateTime? @db.Timestamptz(6)
+  contract_no    String?   @db.VarChar(50)
+  m_org          m_org     @relation(fields: [org_code], references: [org_code], onDelete: NoAction, onUpdate: NoAction, map: "fk_m_org_package_org_code")
+  m_package      m_package @relation(fields: [package_id], references: [package_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_m_org_package_package_id")
+}
+
+model m_org_service_element {
+  service_element_id Int       @id @unique(map: "pk_m_org_service_element") @default(autoincrement())
+  org_code           String    @db.VarChar(50)
+  service_id         Int
+  version            Int
+  customer_url       String?   @db.VarChar(500)
+  conf_element_json  Json?     @db.Json
+  create_date        DateTime  @default(now()) @db.Timestamptz(6)
+  create_by          String?   @db.VarChar(50)
+  update_date        DateTime  @default(now()) @db.Timestamptz(6)
+  update_by          String?   @db.VarChar(50)
+  delete_date        DateTime? @db.Timestamptz(6)
+  m_org              m_org     @relation(fields: [org_code], references: [org_code], onDelete: NoAction)
+  m_service          m_service @relation(fields: [service_id], references: [id], onDelete: NoAction)
+}
+
+model m_package {
+  package_id    Int             @id @unique(map: "pk_m_package") @default(autoincrement())
+  package_name  String          @db.VarChar(200)
+  limit_usage   Int
+  create_date   DateTime        @default(now()) @db.Timestamptz(6)
+  create_by     String?         @db.VarChar(50)
+  update_date   DateTime        @default(now()) @db.Timestamptz(6)
+  update_by     String?         @db.VarChar(50)
+  almost_limit  Int?
+  m_org_package m_org_package[]
+}
+
+model m_service {
+  id                    Int                     @id @unique(map: "pk_m_service")
+  service_path          String                  @db.VarChar(100)
+  service_name          String                  @db.VarChar(200)
+  credit_cost           Int                     @default(0)
+  create_date           DateTime                @default(now()) @db.Timestamptz(6)
+  create_by             String?                 @db.VarChar(50)
+  update_date           DateTime                @default(now()) @db.Timestamptz(6)
+  update_by             String?                 @db.VarChar(50)
+  m_org_service_element m_org_service_element[]
+}
+
+model t_document_identifier {
+  doc_id                        String                          @id @unique(map: "pk_t_document_identifier") @db.VarChar(50)
+  api_id                        String                          @db.VarChar(100)
+  total_page                    Int
+  total_service_usage           Int
+  total_credit_usage            Decimal                         @db.Decimal(10, 2)
+  create_date                   DateTime                        @default(now()) @db.Timestamptz(6)
+  update_date                   DateTime                        @default(now()) @db.Timestamptz(6)
+  t_document_identifier_service t_document_identifier_service[]
+}
+
+model t_document_identifier_service {
+  service_id            Int                   @id @unique(map: "pk_t_document_identifier_service") @default(autoincrement())
+  doc_id                String                @db.VarChar(50)
+  service_path          String                @db.VarChar(100)
+  status_code           Int?
+  status_message        String?               @db.VarChar(255)
+  create_date           DateTime              @default(now()) @db.Timestamptz(6)
+  update_date           DateTime              @default(now()) @db.Timestamptz(6)
+  t_document_identifier t_document_identifier @relation(fields: [doc_id], references: [doc_id], onDelete: Cascade)
+}
+
+model t_email {
+  id             Int      @id @unique(map: "pk_t_email") @default(autoincrement())
+  email_admin    String   @db.VarChar(100)
+  email_org      String   @db.VarChar(100)
+  email_code     String   @db.VarChar(50)
+  org_package_id Int // remove
+  sent_status    Boolean  @default(false)
+  create_date    DateTime @default(now()) @db.Timestamptz(6)
+  create_by      String?  @db.VarChar(50)
+  update_date    DateTime @default(now()) @db.Timestamptz(6)
+  update_by      String?  @db.VarChar(50)
+}
+
+model t_integration {
+  id          String   @id @db.VarChar(255)
+  org_code    String   @db.VarChar(50)
+  module      String   @db.VarChar(30)
+  module_type String?  @db.VarChar(30)
+  action_at   DateTime @db.Timestamptz(6)
+  result      Json?
+  create_date DateTime @db.Timestamptz(6)
+  update_date DateTime @db.Timestamptz(6)
+  m_org       m_org    @relation(fields: [org_code], references: [org_code], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([module], map: "t_integration_module")
+  @@index([module_type], map: "t_integration_module_type")
+}
+
+model t_usage {
+  transaction_id   String   @id @unique(map: "pk_t_usage") @db.Uuid
+  api_id           String   @db.VarChar(100)
+  user_id          String?  @db.VarChar(100)
+  service_path     String?  @db.VarChar(100)
+  transaction_time DateTime @default(now()) @db.Timestamptz(6)
+  status_code      Int?
+  latency_ms       Int?
+  create_date      DateTime @default(now()) @db.Timestamptz(6)
+  create_by        String?  @db.VarChar(50)
+  update_date      DateTime @default(now()) @db.Timestamptz(6)
+  update_by        String?  @db.VarChar(50)
+}

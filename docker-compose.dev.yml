@@ -1,0 +1,48 @@
+version: "3.8"
+
+volumes:
+  middleware-postgres-staging:
+  middleware-postgres-dev:
+  middleware-postgres:
+
+services:
+  
+  ml-billing-database-dev:
+    container_name: ml-billing-database-dev
+    image: postgres:14.2-alpine
+    ports:
+      - 5434:5432
+    volumes:
+      - middleware-postgres-dev:/var/lib/postgresql/data
+    environment:
+      - DOCKER_DEFAULT_PLATFORM=linux/amd64
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=1q2w3e4r
+      - POSTGRES_DB=postgres
+
+
+  ml-billing-database:
+    container_name: ml-billing-database
+    image: postgres:14.2-alpine
+    ports:
+      - 5432:5432
+    volumes:
+      - middleware-postgres:/var/lib/postgresql/data
+    environment:
+      - DOCKER_DEFAULT_PLATFORM=linux/amd64
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=1q2w3e4r
+      - POSTGRES_DB=postgres
+
+  ml-billing-database-staging:
+    container_name: ml-billing-database-staging
+    image: postgres:14.2-alpine
+    ports:
+      - 5435:5432
+    volumes:
+      - middleware-postgres-staging:/var/lib/postgresql/data
+    environment:
+      - DOCKER_DEFAULT_PLATFORM=linux/amd64
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=1q2w3e4r
+      - POSTGRES_DB=postgres

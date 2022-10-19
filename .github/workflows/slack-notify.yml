@@ -1,0 +1,21 @@
+
+on:
+  release:
+    types: ["published"]
+
+name: ML Billing Slack Notification
+jobs:
+  slackNotification:
+    name: Slack Notification
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Slack Notification
+      uses: rtCamp/action-slack-notify@v2
+      env:
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        SLACK_USERNAME: ML Billing
+        SLACK_COLOR: good
+        SLACK_ICON: https://avatars.githubusercontent.com/u/36249656?s=48&v=4
+        SLACK_TITLE: 'ML Billing Release :rocket:'
+        SLACK_MESSAGE: We have released a new version, let's have a quick look.
