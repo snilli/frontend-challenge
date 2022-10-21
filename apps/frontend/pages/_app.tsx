@@ -1,34 +1,41 @@
+import { MantineProvider } from '@mantine/core'
 import { AppProps } from 'next/app'
 import Head from 'next/head'
-import { MantineProvider } from '@mantine/core'
+import { CatApiProvider, getCatApi } from '../contexts/CatApiContext'
+declare module '@mantine/core' {
+	export interface MantineThemeOther {
+		color: {
+			main: string
+		}
+	}
+}
 
 export default function App(props: AppProps) {
 	const { Component, pageProps } = props
-
+	const catApi = getCatApi('')
 	return (
 		<>
 			<Head>
-				<title>Mee`</title>
+				<title>Mee</title>
 				<meta name="viewport" content="minimum-scale=1, initial-scale=1, width=device-width" />
 			</Head>
-
 			<MantineProvider
 				withGlobalStyles
 				withNormalizeCSS
 				theme={{
+					fontFamily: 'Montserrat',
 					colorScheme: 'light',
 					cursorType: 'default',
-					// primaryColor: 'red',
-					// primaryShade: 6,
-					// defaultRadius: 'sm',
-					// defaultGradient: {
-					// 	from: 'orange',
-					// 	to: '#EF4F4E',
-					// 	deg: 45,
-					// },
+					other: {
+						color: {
+							main: '#291507',
+						},
+					},
 				}}
 			>
-				<Component {...pageProps} />
+				<CatApiProvider catApi={catApi}>
+					<Component {...pageProps} />
+				</CatApiProvider>
 			</MantineProvider>
 		</>
 	)

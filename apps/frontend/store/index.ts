@@ -1,7 +1,8 @@
+import { combineReducers, configureStore } from '@reduxjs/toolkit'
 import { atomWithStore } from 'jotai/redux'
-import { configureStore, combineReducers } from '@reduxjs/toolkit'
+import { breedReducer } from './breed'
 
-const rootReducer = combineReducers({})
+const rootReducer = combineReducers({ breed: breedReducer })
 
 const store = configureStore({ reducer: rootReducer })
 
